@@ -1,0 +1,8 @@
+__pycache__
+raw.githubusercontent.com
+*.vscode
+*.log
+events*
+outputs/*
+results/*
+*.egg-info

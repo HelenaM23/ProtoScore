@@ -1,0 +1,3 @@
+name: StarLightCurve
+n_classes: 3
+labels: ["Star1", "Star2", "Star3"]

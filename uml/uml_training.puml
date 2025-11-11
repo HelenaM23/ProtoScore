@@ -1,0 +1,215 @@
+@startuml prototype_training_system
+
+' ===== DATA MODULE =====
+package "data" {
+    abstract class BaseDataset {
+        #_outlier_fraction: float
+        #_noise_seed: int
+        #_use_gev: bool
+        #_gev_params: tuple
+        #_apply_outlier_noise: bool
+        #_data_splitter: DataSplitter
+        +x_train: ndarray
+        +y_train: ndarray
+        +x_val: ndarray
+        +y_val: ndarray
+        +x_test: ndarray
+        +y_test: ndarray
+        +n_classes: int
+        +num_classes: int
+        +__init__(**kwargs): void
+        #{abstract} _load_data(): void
+        -_execute_loading_pipeline(): void
+        -_validate_data(): void
+        -_set_class_attributes(): void
+        -_apply_outlier_noise_to_splits(): void
+        -_apply_outlier_noise(data: ndarray, indices: ndarray, offset: int): ndarray
+        +convert_to_namespace(): Tuple[SimpleNamespace, SimpleNamespace, SimpleNamespace]
+        +ensure_one_hot_labels(dataset: SimpleNamespace, num_classes: Optional[int]): SimpleNamespace
+        -_is_one_hot_encoded(labels: ndarray): bool
+        -_convert_to_one_hot(dataset: SimpleNamespace, num_classes: Optional[int]): SimpleNamespace
+        +{static} _extract_labels(dataset: SimpleNamespace): ndarray
+        +{static} _normalize_labels(labels: ndarray, num_classes: int): ndarray
+    }
+
+    class FordA_Dataset {
+        -_load_data(): void
+        +{static} _read_ucr_data(filename: str): tuple
+        +{static} _preprocess_ford_data(x_train, x_test, y_train, y_test): tuple
+    }
+
+    class Wafer_Dataset {
+        -_load_data(): void
+        +{static} _read_arff_data(path: str): ndarray
+        +{static} _create_wafer_splits(data2d: ndarray): Tuple[ndarray, ndarray]
+        +{static} _convert_to_3d(data: ndarray): ndarray
+        +{static} _scale_wafer_data(data: ndarray): ndarray
+        -_extract_wafer_splits(train_scaled: ndarray, val_scaled: ndarray, test_scaled: ndarray): void
+    }
+
+    class FordB_Dataset {
+        -_load_data(): void
+        +{static} _read_arff_data(path: str): tuple
+        +{static} _scale_data_per_sample(x: ndarray): ndarray
+        -_preprocess_ford_data(x_train, x_test, y_train, y_test): tuple
+    }
+
+    class ECG200 {
+        -_load_data(): void
+        +{static} _convert_negatives_to_zero(array: ndarray): ndarray
+        -_get_ecg_data(filepath: Path): tuple
+        +{static} _read_arff_file(file_path: Path): Tuple
+        +{static} _convert_arff_to_numpy(data_list): ndarray
+        +{static} _split_ecg_data(X: ndarray, y: ndarray): Tuple
+    }
+
+    class SAWSINE {
+        -_load_data(): void
+        -_generate_sawsine_data(): tuple
+        +{static} _add_noise(signal: ndarray, noise_level: float): ndarray
+        +{static} _split_sawsine_data(X: ndarray, y: ndarray): tuple
+    }
+
+    class StarLightCurve {
+        -_load_data(): void
+        +{static} _read_arff_data(path: str): tuple
+        +{static} _scale_data_per_sample(x: ndarray): ndarray
+        -_preprocess_starlight_data(x_train, x_test, y_train, y_test): tuple
+    }
+
+    class DatasetFactory {
+        -{static} _datasets: Dict[str, Type]
+        +{classmethod} create_dataset(name: str, **kwargs): BaseDataset
+        +{classmethod} get_available_datasets(): list
+        +{classmethod} register_dataset(name: str, dataset_class: type): void
+    }
+
+    class DataSplitter {
+        +{static} train_validation_split(x: ndarray, y: ndarray, test_size: float, random_state: int, stratify: bool): Tuple
+    }
+
+}
+
+' ===== MAIN MODULE =====
+package "main_train_prototypes" {
+    class TrainingOrchestrator {
+        -config: DictConfig
+        -dataset_factory: DatasetFactory
+        -trainer_factory: TrainerFactory
+        +__init__(config: DictConfig): void
+        +validate_config(): void
+        +run_training(): Dict[str, Any]
+        -_create_dataset(): BaseDataset
+        -_create_trainer(): BaseTrainer
+        -_extract_dataset_parameters(): Dict[str, Any]
+        -_prepare_training_parameters(dataset): Dict[str, Any]
+    }
+
+    class MainTrainer {
+        +{static} main(cfg: DictConfig): void
+        -{static} _log_configuration(cfg: DictConfig): void
+        -{static} _log_results(results: Dict[str, Any]): void
+    }
+}
+
+' ===== TRAIN MODELS MODULE =====
+package "train_models" {
+    abstract class BaseModelRunner {
+        +__init__(): void
+        +run(epochs: int, directory: str, data: Any, n_concepts: int, n_classes: int, hp_json_path: str, **kwargs): void
+        -_determine_num_classes(train: SimpleNamespace, n_classes: int): int
+        -_validate_prepared_data(train: SimpleNamespace, val: SimpleNamespace, test: SimpleNamespace): void
+        +{abstract} _execute_training(train: SimpleNamespace, val: SimpleNamespace, test: SimpleNamespace, epochs: int, directory: Path, n_concepts: int, n_classes: int, hp_json_path: str, **kwargs): void
+    }
+
+    class EBERunner {
+        -_execute_training(train: SimpleNamespace, val: SimpleNamespace, test: SimpleNamespace, epochs: int, directory: Path, n_concepts: int, n_classes: int, hp_json_path: str, **kwargs): void
+    }
+
+    class MSPRunner {
+        -_execute_training(train: SimpleNamespace, val: SimpleNamespace, test: SimpleNamespace, epochs: int, directory: Path, n_concepts: int, n_classes: int, hp_json_path: str, **kwargs): void
+    }
+
+    class MAPRunner {
+        -_execute_training(train: SimpleNamespace, val: SimpleNamespace, test: SimpleNamespace, epochs: int, directory: Path, n_concepts: int, n_classes: int, hp_json_path: str, **kwargs): void
+    }
+
+    abstract class BaseTrainer {
+        #_runner: BaseModelRunner
+        +__init__(runner: BaseModelRunner): void
+        +run(epochs: int, directory: str, data: Any, n_concepts: int, n_classes: int, hp_json_path: str, **kwargs): void
+    }
+
+    class EBETrainer {
+        +__init__(): void
+    }
+
+    class MSPTrainer {
+        +__init__(): void
+    }
+
+    class MAPTrainer {
+        +__init__(): void
+    }
+
+    class TrainerFactory {
+        -{static} _trainers: Dict[str, Type]
+        +{classmethod} create_trainer(method_name: str): BaseTrainer
+        +{classmethod} register_trainer(name: str, trainer_class: type): void
+        +{classmethod} get_available_methods(): list
+    }
+
+    class ConfigValidator {
+        +{static} REQUIRED_FIELDS: Dict[str, List[str]]
+        +{static} VALID_METHODS: List[str]
+        +{static} VALID_DATASETS: List[str]
+        +{classmethod} validate_config(config: DictConfig): void
+        +{classmethod} _validate_required_fields(config: DictConfig): void
+        +{classmethod} _validate_method(method_name: str): void
+        +{classmethod} _validate_dataset(dataset_name: str): void
+        +{classmethod} _validate_numeric_fields(config: DictConfig): void
+    }
+
+}
+
+' ===== RELATIONSHIPS =====
+
+' Core inheritance hierarchies
+BaseDataset <|-- FordA_Dataset
+BaseDataset <|-- Wafer_Dataset
+BaseDataset <|-- FordB_Dataset
+BaseDataset <|-- ECG200
+BaseDataset <|-- BlinkDataset
+BaseDataset <|-- SAWSINE_SEPERATE
+BaseDataset <|-- StarLightCurve
+
+BaseModelRunner <|-- EBERunner
+BaseModelRunner <|-- MSPRunner
+BaseModelRunner <|-- MAPRunner
+
+BaseTrainer <|-- EBETrainer
+BaseTrainer <|-- MSPTrainer
+BaseTrainer <|-- MAPTrainer
+
+' Composition relationships
+BaseDataset *-- DataSplitter : contains
+BaseTrainer *-- BaseModelRunner : contains
+
+' Factory pattern relationships
+DatasetFactory ..> BaseDataset : creates
+TrainerFactory ..> BaseTrainer : creates
+
+' Core usage relationships
+TrainingOrchestrator --> DatasetFactory : uses
+TrainingOrchestrator --> TrainerFactory : uses
+TrainingOrchestrator --> ConfigValidator : uses
+
+' Main execution flow
+MainTrainer ..> TrainingOrchestrator : uses
+
+' Trainer delegation (composition shown above)
+EBETrainer ..> EBERunner : delegates to
+MSPTrainer ..> MSPRunner : delegates to
+MAPTrainer ..> MAPRunner : delegates to
+
+@enduml

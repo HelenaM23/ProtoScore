@@ -1,0 +1,21 @@
+defaults:
+  - _self_
+  - method: ebe
+  - dataset: FordB
+
+# Split Parameters
+random_state: 42
+test_size: 0.2
+validation_size: 0.2 # if validation_size not defined, no validation set is used
+stratified: True
+min_samples_per_class: 2 # ensure at least these many samples per class in each split
+
+# Latent Space Parameters
+n_concepts: 4
+latent_dim: 30
+
+n_replicas: 3 # number of replicas for consistency evaluation
+
+# Paths
+train_hyperparameters_path: config/method/${method.name}.yaml
+directory: results/model/${method.name}/${dataset.name}/${method.epochs}_epoch/${now:%Y-%m-%d_%H-%M}/

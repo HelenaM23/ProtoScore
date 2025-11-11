@@ -1,0 +1,3 @@
+name: FordA
+n_classes: 2
+labels: ["Normal", "Abnormal"]

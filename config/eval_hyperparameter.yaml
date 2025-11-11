@@ -1,0 +1,20 @@
+defaults:
+  - _self_
+  - method: msp
+  - dataset: Sawsine
+  - evaluation_metrics: prototypes_standard # for ebe no decoder
+  - metric_weights: uniform
+  - clustering_config: default
+  - plot_config: default
+
+distance_metric: DTW  # euclidean or DTW
+n_concepts: 4
+latent_dim: 20
+date: 2025-11-04_11-33
+
+n_replicas: 1 # number of replicas for consistency evaluation
+
+input_directory: results/model/${method.name}/${dataset.name}/${method.epochs}_epoch/${date}
+output_directory: results/evaluation/${method.name}/${dataset.name}/${method.epochs}_epoch/${date}/${distance_metric}
+
+visualize_clustering: True

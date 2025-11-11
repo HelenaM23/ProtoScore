@@ -1,0 +1,544 @@
+@startuml combined_prototype_evaluation_system
+' ===== DATA MODULE =====
+package "data" {
+    abstract class BaseDataset {
+        #outlier_fraction: float
+        #noise_seed: int
+        #use_gev: bool
+        +x_train, y_train: ndarray
+        +x_val, y_val: ndarray
+        +x_test, y_test: ndarray
+        +n_classes: int
+        +__init__(**kwargs): void
+        -{abstract} _load_data(): void
+        -_load_and_preprocess(): void
+    }
+
+    class FordA_Dataset {
+        -_load_data(): void
+        +{static} _readucr(filename: str): tuple
+    }
+
+    class Wafer_Dataset {
+        -_load_data(): void
+        +{static} read_ariff(path: str): ndarray
+    }
+
+    class FordB_Dataset {
+        -_load_data(): void
+        +{static} _read_arff(path: str): tuple
+    }
+
+    class ECG200 {
+        -_load_data(): void
+        +{static} get_data(filepath: str): tuple
+    }
+
+    class BlinkDataset {
+        +label_encoder: LabelEncoder
+        -_load_data(): void
+    }
+
+    class SAWSINE_SEPERATE {
+        -_load_data(): void
+        +{static} get_data(): tuple
+    }
+
+    class StarLightCurve {
+        -_load_data(): void
+        +{static} _read_arff(path: str): tuple
+    }
+
+    class DatasetFactory {
+        -{static} _datasets: Dict[str, Type]
+        +{static} create_dataset(name: str, **kwargs): BaseDataset
+        +{static} get_available_datasets(): list
+    }
+
+    class DataSplitter {
+        +train_validation_split(x: ndarray, y: ndarray, test_size: float, random_state: int, stratify: bool): tuple
+    }
+}
+
+' ===== DISTANCE MODULE =====
+package "distance" {
+    abstract class DistanceCalculator {
+        +{abstract} compute_distance(X: ndarray, Y: ndarray): ndarray
+    }
+
+    class EuclideanDistance {
+        +compute_distance(X: ndarray, Y: ndarray): ndarray
+    }
+
+    class DTWDistance {
+        -decoder: Any
+        +__init__(decoder: Any): void
+        +compute_distance(X: ndarray, Y: ndarray): ndarray
+    }
+
+    class DistanceCalculatorFactory {
+        -{static} _SUPPORTED_METRICS: Set[str]
+        +{classmethod} create(metric: str, decoder: Optional): DistanceCalculator
+    }
+
+    class DTWUtils {
+        +{static} fast_dtw_core(x: ndarray, y: ndarray, window_size: int): float
+        +{static} dtw_cdist_with_progress(X: ndarray, Y: ndarray, window_fraction: float, n_jobs: int): ndarray
+    }
+}
+
+' ===== METRICS MODULE =====
+package "metrics" {
+    abstract class BaseEvaluationMetric {
+        #distance_metric: str
+        #distance_calculator: DistanceCalculator
+        +__init__(distance_metric: str, decoder: Optional): void
+        +{abstract} compute(**kwargs): float
+        +_validate_inputs(**kwargs): void
+    }
+
+    class ConsistencyMetric {
+        +compute(): Tuple[float, float]
+        -_compute_model_distances(): List[float]
+        -_compute_consistency_error(): float
+    }
+
+    class ContinuityMetric {
+        +DEFAULT_NOISE_SCALE: float
+        +compute(): float
+        -_get_closest_prototypes(): ndarray
+        -_add_noise(): ndarray
+    }
+
+    class ContrastivityMetric {
+        +compute(prototypes: ndarray): float
+    }
+
+    class CorrectnessMetric {
+        +compute(): Dict[str, float]
+        -_get_original_predictions(): ndarray
+        -_get_prototype_predictions(): ndarray
+    }
+
+    class CompactnessMetric {
+        +COMPACTNESS_FACTOR: float
+        +compute(prototypes: ndarray): float
+    }
+
+    class ConfidenceMetric {
+        +compute(): float
+    }
+
+    class CohesionOfLatentSpaceMetric {
+        +compute(): float
+        -_compute_silhouette_score(): float
+    }
+
+    class InputCompletenessMetric {
+        +compute(): float
+        -_identify_matched_centroids(): List[bool]
+    }
+
+    class CovariateComplexityMetric {
+        +compute(): float
+        -_compute_prototype_silhouette_scores(): List[float]
+    }
+}
+
+' ===== SCORE MODULE =====
+package "score" {
+    enum AggregationMethod {
+        ARITHMETIC
+        GEOMETRIC
+        HARMONIC
+    }
+
+    class ScoreCalculator {
+        +{static} compute_final_score(): float
+        +{static} compute_score_breakdown(): Dict
+    }
+
+    class ScoreValidator {
+        +{static} validate_results(): void
+        +{static} validate_weights(): void
+        +{static} validate_method(): AggregationMethod
+    }
+
+    class WeightNormalizer {
+        +{static} filter_and_normalize(): tuple
+    }
+
+    class AggregationCalculator {
+        +{static} calculate(): float
+        -{static} _arithmetic_mean(): float
+        -{static} _geometric_mean(): float
+        -{static} _harmonic_mean(): float
+    }
+}
+
+' ===== CLUSTER MODULE =====
+package "cluster" {
+    class ClusteringConfig {
+        +default_random_state: int
+        +min_clusters: int
+        +max_clusters: int
+        +cluster_range: Tuple[int, int]
+        +__init__(cfg: Any): void
+    }
+
+    class ValidationError <<Exception>> {
+        +__init__(message: str): void
+    }
+
+    class ClusteringValidator {
+        +{static} validate_data(data: ndarray, min_samples: int): void
+        +{static} validate_cluster_params(n_clusters: int, data_size: int): void
+    }
+
+    class DimensionalityReducer {
+        -{static} _REDUCERS: Dict[str, Callable]
+        -method: str
+        -config: ClusteringConfig
+        +__init__(method: str, config: Optional[ClusteringConfig]): void
+        +reduce_data(data: ndarray, n_components: Optional[int]): ndarray
+    }
+
+    class DataPreprocessor {
+        -scale_data: bool
+        -reduce_dimensions: bool
+        -config: ClusteringConfig
+        +__init__(scale_data: bool, reduce_dimensions: bool, reduction_method: str, config: Optional[ClusteringConfig]): void
+        +preprocess(data: ndarray, n_components: Optional[int]): ndarray
+    }
+
+    class ClusterOptimizer {
+        -distance_metric: str
+        -decoder: Any
+        -config: ClusteringConfig
+        -distance_calculator: DistanceCalculator
+        +__init__(distance_metric: str, decoder: Any, config: Optional[ClusteringConfig]): void
+        +find_optimal_clusters(data: ndarray, cluster_range: Optional[Tuple[int, int]]): Tuple[Optional[ndarray], float]
+        +clear_cache(): void
+    }
+
+    abstract class ClusteringStrategy {
+        #distance_metric: str
+        #decoder: Any
+        #config: ClusteringConfig
+        #optimizer: ClusterOptimizer
+        +__init__(distance_metric: str, decoder: Any, clustering_config: Optional[ClusteringConfig]): void
+        +{abstract} compute_multilevel_clustering(embeddings: ndarray, n_main_clusters: Optional[int], labels: Optional[ndarray], cluster_range: Optional[Tuple[int, int]]): Dict[str, Dict[str, ndarray]]
+    }
+
+    class BasicClustering {
+        -use_optimal_clusters: bool
+        +__init__(distance_metric: str, decoder: Any, use_optimal_clusters: bool, clustering_config: Optional[ClusteringConfig]): void
+        +compute_multilevel_clustering(...): Dict[str, Dict[str, ndarray]]
+    }
+
+    class HierarchicalClustering {
+        +__init__(distance_metric: str, decoder: Any, clustering_config: Optional[ClusteringConfig]): void
+        +compute_multilevel_clustering(...): Dict[str, Dict[str, ndarray]]
+    }
+
+    class ClusterMetricsCalculator {
+        -config: ClusteringConfig
+        +__init__(config: Optional[ClusteringConfig]): void
+        +compute_centroids_cached(embeddings_hash: str, labels_hash: str): str
+        +{static} compute_centroids(embeddings: ndarray, cluster_labels: ndarray): ndarray
+    }
+
+    class PrototypeMapper {
+        -distance_calculator: DistanceCalculator
+        -config: ClusteringConfig
+        +__init__(distance_metric: str, decoder: Any, config: Optional[ClusteringConfig]): void
+        +compute_mapping(prototypes: ndarray, embeddings: ndarray, cluster_labels: ndarray): Tuple[Dict[int, Dict[str, Any]], Dict[int, Dict[str, Any]]]
+        +clear_cache(): void
+    }
+
+    class ClusteringFactory {
+        +{static} create_clustering_strategy(distance_metric: str, decoder: Any, use_optimal_clusters: bool, clustering_config: Optional[ClusteringConfig]): ClusteringStrategy
+    }
+}
+
+' ===== EVALUATORS MODULE =====
+package "evaluators" {
+    class EvaluationConfig {
+        +distance_metric: str
+        +criteria: dict
+        +metric_weights: dict
+        +visualize: bool
+        +__init__(cfg: Any): void
+    }
+
+    abstract class BaseEvaluator {
+        #config: EvaluationConfig
+        #logger: Logger
+        #evaluator: PrototypeEvaluator
+        #prototype_extractor: PrototypeExtractor
+        #visualizer: ClusteringVisualizer
+        +__init__(config: EvaluationConfig): void
+        +evaluate(weight_path: str, directory: str, label_legends: dict, dataset: BaseDataset, **kwargs): dict
+        +{abstract} _load_model_components(weight_path: str, directory: str, dataset: BaseDataset, **kwargs): dict
+        +{abstract} _extract_prototypes(directory: str, **kwargs): ndarray
+    }
+
+    class MAPEvaluator {
+        -_load_model_components(...): dict
+        -_extract_prototypes(...): ndarray
+    }
+
+    class MSPEvaluator {
+        -_msp_prototypes: ndarray
+        -_load_model_components(...): dict
+        -_extract_prototypes(...): ndarray
+    }
+
+    class EBEEvaluator {
+        -_load_model_components(...): dict
+        -_extract_prototypes(...): ndarray
+    }
+
+    class EvaluatorFactory {
+        -{static} _evaluators: Dict[str, Type]
+        +{static} create_evaluator(method: str, config: EvaluationConfig): BaseEvaluator
+        +{static} get_supported_methods(): list
+    }
+
+    class MethodEvaluator {
+        +config: DictConfig
+        +eval_config: EvaluationConfig
+        +logger: Logger
+        +__init__(config: DictConfig): void
+        +validate_config(): void
+        +run_evaluation(): Dict[str, Any]
+    }
+
+    class PrototypeEvaluator {
+        -distance_metric: str
+        -metric_weights: Dict[str, float] 
+        -clustering_config: ClusteringConfig
+        +__init__(distance_metric: str, metric_weights: Optional[Dict[str, float]], clustering_config: Optional[Dict[str, Any]]): void
+        +evaluate(encoder: EncoderWrapper, decoder: DecoderWrapper, classifier: ClassifierWrapper, data: SimpleNamespace, prototypes: ndarray, save_path: str, criteria: Optional[Dict[str, bool]], **kwargs): Dict[str, Any]
+    }
+}
+
+' ===== VISUALIZATION MODULE =====
+package "visualization" {
+    class PlotConfig {
+        +figure_size: Tuple[int, int]
+        +marker_size_embeddings: int
+        +marker_size_centroids: int
+        +marker_size_prototypes: int
+        +dpi: int
+        +__init__(cfg: Any): void
+    }
+
+    class VisualizationData <<dataclass>> {
+        +embeddings_2d: ndarray
+        +cluster_labels: ndarray
+        +centroids_2d: ndarray
+        +prototypes_2d: ndarray
+        +class_label: str
+    }
+
+    abstract class DimensionReducer {
+        +{abstract} fit_transform(data: ndarray): ndarray
+        +{abstract} transform(data: ndarray): ndarray
+    }
+
+    class PCAReducer {
+        -n_components: int
+        +fit_transform(data: ndarray): ndarray
+        +transform(data: ndarray): ndarray
+    }
+
+    class TSNEReducer {
+        -n_components: int
+        -random_state: int
+        +fit_transform(data: ndarray): ndarray
+        +transform(data: ndarray): ndarray
+    }
+
+    class UMAPReducer {
+        -n_components: int
+        -random_state: int
+        +fit_transform(data: ndarray): ndarray
+        +transform(data: ndarray): ndarray
+    }
+
+    class ReducerFactory {
+        -{static} _reducers: Dict[str, Type]
+        +{static} create_reducer(method: str, **kwargs): DimensionReducer
+    }
+
+    class PlotRenderer {
+        +config: PlotConfig
+        +marker_shapes: list
+        +colors: array
+        +plot_embeddings(ax: Any, vis_data: VisualizationData, class_idx: int, label_legend: dict): void
+        +plot_centroids(ax: Any, vis_data: VisualizationData, class_idx: int, label_legend: dict): void
+        +plot_prototypes(ax: Any, prototypes_2d: ndarray, mapping: dict, centroid_idx_to_class_label: dict): void
+    }
+
+    class ClusteringVisualizer {
+        +config: PlotConfig
+        +plot_renderer: PlotRenderer
+        +visualize_clustering(output_clustering: dict, all_labels_metrics_centroids: dict, prototypes: ndarray, mapping: dict, label_legend: dict, method: str, save_path: str): void
+    }
+}
+
+' ===== HELPER MODULE =====
+package "helper" {
+    abstract class FileHandler {
+        +{abstract} read(filepath: str): Any
+        +{abstract} write(data: Any, filepath: str): void
+    }
+
+    class HDF5Handler {
+        +read(filepath: str): Dict[str, Any]
+        +write(data: Any, filepath: str): void
+    }
+
+    class PickleHandler {
+        +read(filepath: str): Any
+        +write(data: Any, filepath: str): void
+    }
+
+    class CSVHandler {
+        +read(filepath: str): pd.DataFrame
+        +write(data: pd.DataFrame, filepath: str): void
+    }
+
+    class JSONHandler {
+        +read(filepath: str): Dict[str, Any]
+        +write(data: Dict[str, Any], filepath: str): void
+    }
+
+    class FileHandlerFactory {
+        -{static} _handlers: Dict[str, Type]
+        +{static} create_handler(filepath: str): FileHandler
+    }
+
+    class PrototypeExtractor {
+        +extract_from_csv_map(filepath: str): ndarray
+    }
+
+    class ConfigurationManager {
+        +load_from_json(json_path: str): argparse.Namespace
+    }
+}
+
+' ===== WRAPPER MODULE =====
+package "wrapper" {
+    abstract class ModelWrapper {
+        #_model: Callable
+        +__init__(model: Callable): void
+        +{abstract} call(inputs: tf.Tensor): tf.Tensor
+        +__call__(inputs: tf.Tensor): tf.Tensor
+    }
+
+    class EncoderWrapper {
+        +call(inputs: tf.Tensor): tf.Tensor
+    }
+
+    class DecoderWrapper {
+        +call(inputs: tf.Tensor): tf.Tensor
+    }
+
+    class ClassifierWrapper {
+        +call(inputs: tf.Tensor): tf.Tensor
+    }
+
+    class CompositeClassifier {
+        -_encoder: Callable
+        -_predictor: Callable
+        +__init__(encoder: Callable, predictor: Callable, name: str, **kwargs): void
+        +call(inputs: tf.Tensor, training: Optional[bool]): tf.Tensor
+    }
+
+    class WrapperFactory {
+        +{static} create_encoder_wrapper(model: Callable, model_type: str): EncoderWrapper
+        +{static} create_decoder_wrapper(model: Callable): DecoderWrapper
+        +{static} create_classifier_wrapper(model: Callable, model_type: str, **kwargs): ClassifierWrapper
+    }
+}
+
+' ===== MAIN MODULE =====
+package "main" {
+    class MainEvaluator {
+        +{static} main(cfg: DictConfig): void
+    }
+}
+
+' ===== RELATIONSHIPS =====
+BaseDataset <|-- FordA_Dataset
+BaseDataset <|-- Wafer_Dataset  
+BaseDataset <|-- FordB_Dataset
+BaseDataset <|-- ECG200
+BaseDataset <|-- BlinkDataset
+BaseDataset <|-- SAWSINE_SEPERATE
+BaseDataset <|-- StarLightCurve
+
+DistanceCalculator <|-- EuclideanDistance
+DistanceCalculator <|-- DTWDistance
+DTWDistance ..> DTWUtils : uses
+
+BaseEvaluationMetric <|-- ConsistencyMetric
+BaseEvaluationMetric <|-- ContinuityMetric
+BaseEvaluationMetric <|-- ContrastivityMetric
+BaseEvaluationMetric <|-- CorrectnessMetric
+BaseEvaluationMetric <|-- CompactnessMetric
+BaseEvaluationMetric <|-- ConfidenceMetric
+BaseEvaluationMetric <|-- CohesionOfLatentSpaceMetric
+BaseEvaluationMetric <|-- InputCompletenessMetric
+BaseEvaluationMetric <|-- CovariateComplexityMetric
+
+ClusteringStrategy <|-- BasicClustering
+ClusteringStrategy <|-- HierarchicalClustering
+
+BaseEvaluator <|-- MAPEvaluator
+BaseEvaluator <|-- MSPEvaluator
+BaseEvaluator <|-- EBEEvaluator
+
+DimensionReducer <|-- PCAReducer
+DimensionReducer <|-- TSNEReducer
+DimensionReducer <|-- UMAPReducer
+
+FileHandler <|-- HDF5Handler
+FileHandler <|-- PickleHandler
+FileHandler <|-- CSVHandler
+FileHandler <|-- JSONHandler
+
+ModelWrapper <|-- EncoderWrapper
+ModelWrapper <|-- DecoderWrapper
+ModelWrapper <|-- ClassifierWrapper
+
+' Factory relationships
+DatasetFactory ..> BaseDataset : creates
+DistanceCalculatorFactory ..> DistanceCalculator : creates
+EvaluatorFactory ..> BaseEvaluator : creates
+ReducerFactory ..> DimensionReducer : creates
+FileHandlerFactory ..> FileHandler : creates
+WrapperFactory ..> ModelWrapper : creates
+ClusteringFactory ..> ClusteringStrategy : creates
+
+' Core dependencies
+BaseDataset ..> DataSplitter : uses
+BaseEvaluator ..> EvaluationConfig : uses
+BaseEvaluator ..> PrototypeEvaluator : uses
+BaseEvaluator ..> ClusteringVisualizer : uses
+ScoreCalculator ..> ScoreValidator : uses
+ScoreCalculator ..> WeightNormalizer : uses
+ScoreCalculator ..> AggregationCalculator : uses
+ClusteringStrategy ..> ClusterOptimizer : uses
+MethodEvaluator ..> EvaluationConfig : uses
+MethodEvaluator ..> EvaluatorFactory : uses
+ClusteringVisualizer ..> PlotConfig : uses
+ClusteringVisualizer ..> PlotRenderer : uses
+MainEvaluator ..> MethodEvaluator : uses
+PrototypeEvaluator ..> ClusteringFactory : uses
+PrototypeEvaluator ..> PrototypeMapper : uses
+PrototypeEvaluator ..> ScoreCalculator : uses
+
+@enduml

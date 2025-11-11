@@ -1,0 +1,9 @@
+LSA  : 1
+covariate_complexity  : 1
+correctness  : 2
+compactness  : 1
+coverage  : 1
+continuity  : 1
+contrastivity  : 2
+confidence  : 1
+consistency : 1

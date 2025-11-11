@@ -1,0 +1,21 @@
+
+figure_size: [30, 10]
+dpi: 300
+save_format: pdf
+
+xlabel_fontsize: 25
+ylabel_fontsize: 25
+tick_labelsize: 20
+legend_fontsize: 20
+
+legend_position: "upper left"
+legend_bbox_to_anchor: [1.05, 1.0]
+
+marker_size_embeddings: 50
+marker_size_centroids: 400
+marker_size_prototypes: 300
+
+line_alpha: 1.5
+edge_linewidth: 2.5
+
+dimensionality_reduction_method: "pca"  # pca, tsne, umap

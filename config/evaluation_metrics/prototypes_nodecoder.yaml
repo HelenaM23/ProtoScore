@@ -1,0 +1,9 @@
+cohesion_of_latent_space  : True
+covariate_complexity  : True
+correctness  : False
+compactness  : True
+input_completeness  : True
+continuity  : True
+contrastivity  : True
+confidence  : True
+consistency : False
